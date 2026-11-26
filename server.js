@@ -1785,16 +1785,14 @@ function syncOwner(user, snapshot) {
       active: barber.active !== false,
       photo: cleanImage(barber.photo, "Barber photo"),
       workPhotos: Array.isArray(barber.workPhotos)
-        ? barber.workPhotos
-            .slice(0, 10)
-            .map((photo) =>
-              typeof photo === "string"
-                ? cleanImage(photo, "Work photo")
-                : {
-                    url: cleanImage(photo.url, "Work photo"),
-                    caption: optionalText(photo.caption, "Work caption", 120),
-                  },
-            )
+        ? barber.workPhotos.slice(0, 10).map((photo) =>
+            typeof photo === "string"
+              ? cleanImage(photo, "Work photo")
+              : {
+                  url: cleanImage(photo.url, "Work photo"),
+                  caption: optionalText(photo.caption, "Work caption", 120),
+                },
+          )
         : [],
       duties: optionalText(barber.duties || profile.duties, "Duties", 240),
     };
@@ -2481,18 +2479,36 @@ async function apiRoute(req, res, url) {
 function staticFile(req, res, url) {
   if (req.method !== "GET" && req.method !== "HEAD")
     throw new HttpError(405, "Method not allowed.");
+
   const requested = url.pathname === "/" ? "/index.html" : url.pathname;
-  if (!["/index.html"].includes(requested))
-    throw new HttpError(404, "File not found.");
-  const file = path.join(ROOT, "index.html");
+
+  // Only allow approved static files
+  const allowedFiles = {
+    "/index.html": {
+      file: "index.html",
+      contentType: "text/html; charset=utf-8",
+    },
+    "/css/style.css": {
+      file: "css/style.css",
+      contentType: "text/css; charset=utf-8",
+    },
+  };
+
+  const asset = allowedFiles[requested];
+
+  if (!asset) throw new HttpError(404, "File not found.");
+
+  const file = path.join(ROOT, asset.file);
   const content = fs.readFileSync(file);
+
   res.writeHead(200, {
-    "Content-Type": "text/html; charset=utf-8",
+    "Content-Type": asset.contentType,
     "Content-Length": content.length,
     "Cache-Control": "no-cache",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
   });
+
   res.end(req.method === "HEAD" ? undefined : content);
 }
 
